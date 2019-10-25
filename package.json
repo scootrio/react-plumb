@@ -1,0 +1,30 @@
+{
+  "name": "react-plumb",
+  "version": "1.0.0",
+  "description": "React integration for the popular jsPlumb connection library",
+  "main": "src/index.js",
+  "types": "src/index.d.ts",
+  "private": false,
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mootr/react-plumb.git"
+  },
+  "keywords": [],
+  "author": "Braden Hitchcock <developer.hitchcock@gmail.com>",
+  "license": "MIT",
+  "files": [
+    "src/index.js",
+    "src/index.d.ts"
+  ],
+  "bugs": {
+    "url": "https://github.com/mootr/react-plumb/issues"
+  },
+  "homepage": "https://github.com/mootr/react-plumb#readme",
+  "peerDependencies": {
+    "jsplumb": "2.12.3",
+    "react": "^16.11.0"
+  }
+}
