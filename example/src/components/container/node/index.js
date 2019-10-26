@@ -9,6 +9,7 @@ const NodeView = styled.div`
   top: ${({ y }) => y + 'px'};
   left: ${({ x }) => x + 'px'};
   display: flex;
+  background-color: #cccccc;
 `;
 
 const RemoveButton = styled.span`
@@ -22,6 +23,14 @@ const RemoveButton = styled.span`
   margin-right: 5px;
   cursor: pointer;
 `;
+
+export const endpoints = [
+  {
+    isSource: true,
+    isTarget: true,
+    connector: 'Flowchart'
+  }
+];
 
 function Node({ onRemove, ...props }) {
   return (

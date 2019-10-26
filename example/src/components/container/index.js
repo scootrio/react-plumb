@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import ContainerView from './view';
 import useDrop from '../../hooks/useDrop';
-import { usePlumbContainer } from 'react-plumb';
-import Node from './node';
+import usePlumbContainer from 'react-plumb';
+import Node, { endpoints } from './node';
+import './plumb-styles.css';
 
 const genid = () => '' + Math.floor(Math.random() * 10000);
 
@@ -26,7 +27,7 @@ const initialState = [
 
 function Container() {
   const [state, setState] = useState(initialState);
-  const onDrop = data => {
+  const onDrop = data =>
     setState(prev => [
       ...prev,
       {
@@ -35,15 +36,24 @@ function Container() {
         y: data.y
       }
     ]);
-  };
-  const onRemove = id => {
-    setState(prev => prev.filter(n => n.id !== id));
-  };
-  const onDragStop = (id, x, y) => {
-    setState(prev => prev.map(s => (s.id === id ? { id, x, y } : { ...s })));
-  };
+  const onRemove = id => setState(prev => prev.filter(n => n.id !== id));
 
-  const [ref, plumb] = usePlumbContainer({ onDragStop });
+  const [ref, plumb] = usePlumbContainer({
+    onDragStart: () => {},
+    onDragStop: (id, x, y) => setState(prev => prev.map(s => (s.id === id ? { id, x, y } : { ...s }))),
+    onConnect: (sourceId, targetId) => {
+      console.log("Connect", sourceId, targetId);
+    },
+    onDisconnect: (sourceId, targetId) => {
+      console.log("Disconnect", sourceId, targetId);
+    },
+    onConnectionSourceChange: (sourceId, targetId, originalSourceId) => {
+      console.log("Source Change", sourceId, targetId, originalSourceId);
+    },
+    onConnectionTargetChange: (sourceId, targetId, originalTargetId) => {
+      console.log("Target Change", sourceId, targetId, originalTargetId);
+    }
+  });
 
   useDrop({
     ref,
@@ -51,7 +61,9 @@ function Container() {
   });
 
   return (
-    <ContainerView ref={ref}>{plumb(state.map(c => <Node key={c.id} {...c} onRemove={onRemove} />))}</ContainerView>
+    <ContainerView ref={ref}>
+      {plumb(state.map(c => <Node key={c.id} {...c} onRemove={onRemove} endpoints={endpoints} />))}
+    </ContainerView>
   );
 }
 
