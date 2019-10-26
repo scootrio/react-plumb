@@ -20,12 +20,14 @@ module.exports = {
   resolve: {
     extensions: ['*', '.js', '.jsx'],
     alias: {
-      'react-dom': '@hot-loader/react-dom'
+      'react-dom': path.resolve(__dirname, 'node_modules/@hot-loader/react-dom'),
+      'react-plumb': path.resolve(__dirname, '../src'),
+      react: path.resolve(__dirname, 'node_modules/react')
     }
   },
   devServer: {
     contentBase: path.join(__dirname, 'dist'),
     port: 3000
   },
-  plugins: [new HtmlWebpackPlugin()]
+  plugins: [new HtmlWebpackPlugin({ template: './src/index.html' })]
 };
