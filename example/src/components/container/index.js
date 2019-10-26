@@ -27,8 +27,8 @@ const initialState = [
 function Container() {
   const [state, setState] = useState(initialState);
   const onDrop = data => {
-    setState([
-      ...state,
+    setState(prev => [
+      ...prev,
       {
         id: genid(),
         x: data.x,
@@ -37,10 +37,10 @@ function Container() {
     ]);
   };
   const onRemove = id => {
-    setState(state.filter(n => n.id !== id));
+    setState(prev => prev.filter(n => n.id !== id));
   };
   const onDragStop = (id, x, y) => {
-    console.log(id, x, y);
+    setState(prev => prev.map(s => (s.id === id ? { id, x, y } : { ...s })));
   };
 
   const [ref, plumb] = usePlumbContainer({ onDragStop });
