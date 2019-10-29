@@ -25,7 +25,6 @@ module.exports = {
     extensions: ['*', '.js', '.jsx'],
     alias: {
       'react-dom': path.resolve(__dirname, 'node_modules/@hot-loader/react-dom'),
-      'react-plumb': path.resolve(__dirname, '../src'),
       react: path.resolve(__dirname, 'node_modules/react')
     }
   },

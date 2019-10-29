@@ -1,5 +1,28 @@
-import React, { useRef, useState, useEffect, cloneElement } from 'react';
+import React, { useRef, useState, useEffect, cloneElement, createElement } from 'react';
 import { jsPlumb } from 'jsplumb';
+
+export function withEndpoints(endpoints) {
+  return function(Component) {
+    // We just need to wrap it in a new component that we can set default properties on (maintain immutability, pure
+    // functions)
+    function ComponentWithEndpoints(props) {
+      return createElement(Component, props);
+    }
+
+    // We apply the endpoints to the default props so that
+    //
+    // 1) the developer doesn't need to explicitly include the prop when using the component, and
+    // 2) while doing so, the endpoints will be visible to the `usePlumbContainer()` hook
+    //
+    // This comes with the added advantage that, if the developer needs to override endpoint settings for certain
+    // instances, they can by passing in an `endpoints` property to the component.
+    ComponentWithEndpoints.defaultProps = {
+      endpoints
+    };
+
+    return ComponentWithEndpoints;
+  };
+}
 
 export function usePlumbContainer(options = {}) {
   const ref = useRef();
@@ -48,6 +71,10 @@ export function usePlumbContainer(options = {}) {
     }
   });
 
+  instance.bind('beforeDrop', info => {
+    console.log(info.connection.endpoints[0].getUuid());
+  });
+
   function plumb(children) {
     let childrenArray = React.Children.toArray(children);
 
@@ -56,6 +83,9 @@ export function usePlumbContainer(options = {}) {
         let id = child.props.id;
         if (!initialized[id]) {
           // Make the element draggable
+          // TODO: maybe...if the remove button is clicked and the user, realizing they made a mistake, attempts to
+          // drag away from it, then the entire element moves with their mouse and they cannot avoid deleteing the
+          // element. We need to find a way to avoid this.
           instance.draggable(id, {
             start: () => {
               if (options.onDragStart) {
@@ -76,13 +106,23 @@ export function usePlumbContainer(options = {}) {
               instance.addEndpoint(id, e);
             });
           }
-
           initialized[id] = true;
         }
       }
 
       instance.setContainer(ref.current);
       childrenArray.forEach(init);
+
+      // Now that all the nodes have been initialized, we can draw any initial connections we received
+      // TODO: may need an `initializedConnections` object to track connections that already exist between
+      // rerenders (avoid unneccessary re-connects)
+      if (options.connections) {
+        options.connections.forEach(conn => {
+          instance.connect(conn);
+        });
+      }
+
+      // All of the DOM nodes have finished rendering. Now we can start listening for user events.
       finishedFirstRegisterRef.current = true;
 
       // NOTE: we don't need to worry about clean-up when the container component unmounts. As long as each
@@ -109,7 +149,7 @@ export function usePlumbContainer(options = {}) {
             instance.remove(id);
           } else {
             // React will take care of the DOM for us, but we need to unregister everything associated with
-            // the element we are remove from jsPlumb.
+            // the element we are removing from jsPlumb.
             //
             _unregister(id, instance);
             delete initialized[id];
@@ -181,6 +221,7 @@ function _remove(info, affectedElements, instance) {
     delete instance.floatingConnections[_info.id];
     delete managedElements[_info.id];
     // TODO: We need to clear the offset cache to prevent memory leaks
+    // There is no existing API into the jsplumb instance that lets us do this cleanly
     // delete offsets[_info.id];
     if (_info.el) {
       _info.el._jsPlumb = null;

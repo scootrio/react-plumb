@@ -1,5 +1,6 @@
 import React from 'react';
 import styled from 'styled-components';
+import { withEndpoints } from 'react-plumb';
 
 const NodeView = styled.div`
   width: 50px;
@@ -23,14 +24,6 @@ const RemoveButton = styled.span`
   margin-right: 5px;
   cursor: pointer;
 `;
-
-export const endpoints = [
-  {
-    isSource: true,
-    isTarget: true,
-    connector: 'Flowchart'
-  }
-];
 
 function Node({ onRemove, ...props }) {
   return (
