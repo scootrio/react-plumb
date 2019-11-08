@@ -37,7 +37,6 @@ export function usePlumbContainer(options = {}) {
     // Bind to new connections
     //
     instance.bind('connection', (info, ev) => {
-      console.log('Connection event fired');
       if (ev) {
         if (moved.current) {
           moved.current = false;
@@ -58,7 +57,6 @@ export function usePlumbContainer(options = {}) {
     // Bind to disconnect
     //
     instance.bind('connectionDetached', (info, ev) => {
-      console.log('Disconnect event fired');
       if (ev) {
         if (moved.current) {
           moved.current = false;
@@ -77,7 +75,6 @@ export function usePlumbContainer(options = {}) {
     // Bind to a connection move event
     //
     instance.bind('connectionMoved', (info, ev) => {
-      console.log('Connection moved event fired');
       if (ev) {
         moved.current = true;
         // Invoke the connect and disconnect callbacks from here.
@@ -167,7 +164,6 @@ export function usePlumbContainer(options = {}) {
       // Now that all the nodes have been initialized, we can draw any initial connections we received
       if (options.connections) {
         // TODO: figure out the performance implications of this approach. How do we improve it?
-        console.log('Initializing Connections');
         // We first need to remove all of the old connections. This is important for cases where a connection has been
         // moved so we don't cause errors by exceeding the maximum number of connections on a re-render.
         let currentConnections = {};
@@ -176,7 +172,6 @@ export function usePlumbContainer(options = {}) {
         });
         Object.keys(initializedConnections).forEach(id => {
           if (!currentConnections[id]) {
-            console.log('Detected missing connection with ID: ' + id);
             // The connection has been removed
             let conn = instance.getConnections().filter(c => c.id === id)[0];
             instance.deleteConnection(conn, { force: true });
