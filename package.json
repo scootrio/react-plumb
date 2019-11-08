@@ -27,6 +27,7 @@
     "react": "^16.11.0"
   },
   "dependencies": {
-    "jsplumb": "^2.12.3"
+    "jsplumb": "^2.12.3",
+    "uuid": "^3.3.3"
   }
 }

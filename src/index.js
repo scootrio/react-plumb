@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect, cloneElement, createElement } from 'react';
 import { jsPlumb } from 'jsplumb';
+import uuid from 'uuid/v4';
 
 export function withEndpoints(endpoints) {
   return function(Component) {
@@ -27,53 +28,103 @@ export function withEndpoints(endpoints) {
 export function usePlumbContainer(options = {}) {
   const ref = useRef();
   const instance = useState(jsPlumb.getInstance())[0];
-  const initialized = useState({})[0];
-  const finishedFirstRegisterRef = useRef(false);
+  const [bound, setBound] = useState(false);
+  const initializedNodes = useState({})[0];
+  const initializedConnections = useState({})[0];
+  const moved = useRef(false);
 
-  // TODO: when binding to events, decide how we want the calling component to indicate it only wants to capture
-  // events when they are triggered by a user
-  //
-  // For a quick solution, we could always just pass a boolean as the first argument to the callback that says whether
-  // or not the event was user-triggered or programmatic.
+  if (!bound) {
+    // Bind to new connections
+    //
+    instance.bind('connection', (info, ev) => {
+      console.log('Connection event fired');
+      if (ev) {
+        if (moved.current) {
+          moved.current = false;
+          return;
+        }
+        info.connection.id = uuid();
+        info.connection.idPrefix = '';
+        let conn = _connection(info.connection);
 
-  // Bind to new connection events
-  //
-  instance.bind('connection', (info, ev) => {
-    if (finishedFirstRegisterRef.current && options.onConnect) {
-      // TODO: consider the endpoints...do we need to pass them on when invoking the provided function?
-      options.onConnect(info.sourceId, info.targetId);
-    }
-  });
+        initializedConnections[conn.id] = true;
 
-  // Bind to disconnect events
-  //
-  instance.bind('connectionDetached', (info, ev) => {
-    if (finishedFirstRegisterRef.current && options.onDisconnect) {
-      options.onDisconnect(info.sourceId, info.targetId);
-    }
-  });
-
-  // Bind to events where a connection has been moved.
-  //
-  // TODO: decide whether or not to hide this as a default implementation. The reasoning behind this is that, in
-  // most cases, the rest of the application will be able to mimic a "moved" event with a "disconnect" followed by
-  // a "connect". A default implementation would simply call the user's provided "disconnect" handler followed by
-  // their "connect" handler. For the edge cases where the application needs to know about a "move" event explicitly,
-  // it can provides one or both of the callbacks used below to bypass the defaults.
-  //
-  instance.bind('connectionMoved', (info, ev) => {
-    if (finishedFirstRegisterRef.current) {
-      if (info.index === 0 && options.onConnectionSourceChange) {
-        options.onConnectionSourceChange(info.newSourceId, info.newTargetId, info.originalSourceId);
-      } else if (info.index === 1 && options.onConnectionTargetChange) {
-        options.onConnectionTargetChange(info.newSourceId, info.newTargetId, info.originalTargetId);
+        if (options.onConnect) {
+          options.onConnect(conn);
+        }
       }
-    }
-  });
+    });
 
-  instance.bind('beforeDrop', info => {
-    console.log(info.connection.endpoints[0].getUuid());
-  });
+    // Bind to disconnect
+    //
+    instance.bind('connectionDetached', (info, ev) => {
+      console.log('Disconnect event fired');
+      if (ev) {
+        if (moved.current) {
+          moved.current = false;
+          return;
+        }
+        let conn = _connection(info.connection);
+
+        delete initializedConnections[conn.id];
+
+        if (options.onDisconnect) {
+          options.onDisconnect(conn);
+        }
+      }
+    });
+
+    // Bind to a connection move event
+    //
+    instance.bind('connectionMoved', (info, ev) => {
+      console.log('Connection moved event fired');
+      if (ev) {
+        moved.current = true;
+        // Invoke the connect and disconnect callbacks from here.
+        //
+        // For jsPlumb, the "new" connection resulting from the move is not actually new. An existing connection
+        // simply had it's endpoint changed. This is not how we want to represent a moved connection. We want a moved
+        // connection to mimic the destruction of an old connection and the creation of a new connection. This means
+        // that each connection will have two completely different IDs.
+        //
+        // We need to get the old connection ID before calling the disconnect callback, and then we need to construct
+        // a new connection to pass to the onConnect callback. Behind the scenes we simply do an ID swap on the jsPlumb
+        // connection object.
+        let newConn = _connection(info.connection);
+        let oldConn = { ...newConn };
+        newConn.id = uuid();
+        info.connection.id = newConn.id;
+        if (info.index === 0) {
+          // Source changed
+          oldConn.source.id = info.originalSourceId;
+          oldConn.source.endpoint = info.originalSourceEndpoint.getUuid();
+        } else {
+          // Target Changed
+          oldConn.target.id = info.originalTargetId;
+          oldConn.target.endpoint = info.originalTargetEndpoint.getUuid();
+        }
+
+        delete initializedConnections[oldConn.id];
+        initializedConnections[newConn.id] = true;
+
+        if (options.onConnectionMoved) {
+          options.onConnectionMoved(oldConn, newConn);
+        }
+      }
+    });
+
+    // Scope logic.
+    //
+    // jsPlumb offers 'connection' and 'connectionMoved' events that we could bind to, but these are fired after jsPlumb
+    // has already manipulated the DOM. We want React to have exclusive rights to the DOM, so we need to intercept the
+    // creation of a connection by jsPlumb and instead modify state so that React can update the DOM.
+    instance.bind('beforeDrop', info => {
+      // TODO: scopes
+      return true;
+    });
+
+    setBound(true);
+  }
 
   function plumb(children) {
     let childrenArray = React.Children.toArray(children);
@@ -81,7 +132,7 @@ export function usePlumbContainer(options = {}) {
     useEffect(() => {
       function init(child) {
         let id = child.props.id;
-        if (!initialized[id]) {
+        if (!initializedNodes[id]) {
           // Make the element draggable
           // TODO: maybe...if the remove button is clicked and the user, realizing they made a mistake, attempts to
           // drag away from it, then the entire element moves with their mouse and they cannot avoid deleteing the
@@ -106,7 +157,7 @@ export function usePlumbContainer(options = {}) {
               instance.addEndpoint(id, e);
             });
           }
-          initialized[id] = true;
+          initializedNodes[id] = true;
         }
       }
 
@@ -114,16 +165,37 @@ export function usePlumbContainer(options = {}) {
       childrenArray.forEach(init);
 
       // Now that all the nodes have been initialized, we can draw any initial connections we received
-      // TODO: may need an `initializedConnections` object to track connections that already exist between
-      // rerenders (avoid unneccessary re-connects)
       if (options.connections) {
+        // TODO: figure out the performance implications of this approach. How do we improve it?
+        console.log('Initializing Connections');
+        // We first need to remove all of the old connections. This is important for cases where a connection has been
+        // moved so we don't cause errors by exceeding the maximum number of connections on a re-render.
+        let currentConnections = {};
+        Object.values(options.connections).forEach(c => {
+          currentConnections[c.id] = c;
+        });
+        Object.keys(initializedConnections).forEach(id => {
+          if (!currentConnections[id]) {
+            console.log('Detected missing connection with ID: ' + id);
+            // The connection has been removed
+            let conn = instance.getConnections().filter(c => c.id === id)[0];
+            instance.deleteConnection(conn, { force: true });
+            delete initializedConnections[id];
+          }
+        });
+
         options.connections.forEach(conn => {
-          instance.connect(conn);
+          let id = conn.id;
+          if (!initializedConnections[id]) {
+            let newConnection = instance.connect({
+              uuids: [conn.source.endpoint, conn.target.endpoint]
+            });
+            newConnection.id = id;
+            newConnection.idPrefix = '';
+            initializedConnections[id] = true;
+          }
         });
       }
-
-      // All of the DOM nodes have finished rendering. Now we can start listening for user events.
-      finishedFirstRegisterRef.current = true;
 
       // NOTE: we don't need to worry about clean-up when the container component unmounts. As long as each
       // child component has a unique key, React will only rerender elements that do not change. Since these elements
@@ -139,7 +211,8 @@ export function usePlumbContainer(options = {}) {
       let id = child.props.id;
       return cloneElement(child, {
         onRemove: () => {
-          if (!child.props.onRemove) {
+          // TODO: need to trigger state change for connections that are removed
+          if (!child.props.onRemove || typeof child.props.onRemove !== 'function') {
             // If no event handler for removing a node has been registered, then it is safe to assume that React
             // is not controlling the DOM when removing a node registered with jsPlumb elements. We can just remove it.
             //
@@ -151,15 +224,20 @@ export function usePlumbContainer(options = {}) {
             // React will take care of the DOM for us, but we need to unregister everything associated with
             // the element we are removing from jsPlumb.
             //
+            let conns = [...instance.getConnections({ source: id }), ...instance.getConnections({ target: id })].map(
+              _connection
+            );
             _unregister(id, instance);
-            delete initialized[id];
+            delete initializedNodes[id];
+
+            conns.forEach(c => {
+              delete initializedConnections[c.id];
+            });
 
             // Call the user-defined remove function
-            if (child.props.onRemove) {
-              child.props.onRemove(id);
-            }
+            child.props.onRemove(id, conns);
           }
-          delete initialized[id];
+          delete initializedNodes[id];
         }
       });
     }
@@ -234,4 +312,18 @@ function _remove(info, affectedElements, instance) {
   }
   // and always remove the requested one from the dom.
   _one(info);
+}
+
+function _connection(connection) {
+  return {
+    id: connection.id,
+    source: {
+      id: connection.sourceId,
+      endpoint: connection.endpoints[0].getUuid()
+    },
+    target: {
+      id: connection.targetId,
+      endpoint: connection.endpoints[1].getUuid()
+    }
+  };
 }

@@ -55,7 +55,15 @@ const initialState = {
   ],
   connections: [
     {
-      uuids: [connectionSource.uuid, connectionTarget.uuid]
+      id: 'conn-1',
+      source: {
+        id: '1',
+        endpoint: connectionSource.uuid
+      },
+      target: {
+        id: '2',
+        endpoint: connectionTarget.uuid
+      }
     }
   ]
 };

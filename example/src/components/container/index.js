@@ -8,6 +8,7 @@ import initialState, { genid } from './state';
 
 function Container() {
   const [state, setState] = useState(initialState);
+  console.log('Rendering Container with state', state);
   const onDrop = data =>
     setState(prev => ({
       connections: [...prev.connections],
@@ -20,24 +21,36 @@ function Container() {
         }
       ]
     }));
-  const onRemove = id => setState(prev => {
-    
-  });
+  const onRemove = (id, connections) => {
+    let removedIds = connections.map(c => c.id);
+    setState(prev => ({
+      nodes: prev.nodes.filter(n => n.id !== id),
+      connections: prev.connections.filter(c => !removedIds.includes(c.id))
+    }));
+  };
 
   const [ref, plumb] = usePlumbContainer({
     onDragStart: () => {},
-    onDragStop: (id, x, y) => setState(prev => prev.map(s => (s.id === id ? { id, x, y } : { ...s }))),
-    onConnect: (sourceId, targetId) => {
-      console.log('Connect', sourceId, targetId);
+    onDragStop: (id, x, y) =>
+      setState(prev => ({
+        connections: [...prev.connections],
+        nodes: prev.nodes.map(s => (s.id === id ? { id, x, y } : { ...s }))
+      })),
+    onConnect: conn => {
+      console.log('Connect', conn);
+      setState(prev => ({ ...prev, connections: [...prev.connections, conn] }));
     },
-    onDisconnect: (sourceId, targetId) => {
-      console.log('Disconnect', sourceId, targetId);
+    onDisconnect: conn => {
+      console.log('Disconnect', conn);
+      setState(prev => ({ ...prev, connections: prev.connections.filter(c => c.id !== conn.id) }));
     },
-    onConnectionSourceChange: (sourceId, targetId, originalSourceId) => {
-      console.log('Source Change', sourceId, targetId, originalSourceId);
-    },
-    onConnectionTargetChange: (sourceId, targetId, originalTargetId) => {
-      console.log('Target Change', sourceId, targetId, originalTargetId);
+    onConnectionMoved: (oldConn, newConn) => {
+      console.log('Connection Moved', oldConn, newConn);
+      setState(prev => {
+        let connections = prev.connections.filter(c => c.id !== oldConn.id);
+        connections.push(newConn);
+        return { ...prev, connections };
+      });
     },
     connections: state.connections
   });
