@@ -1,6 +1,5 @@
 import React from 'react';
 import styled from 'styled-components';
-import { withEndpoints } from 'react-plumb';
 
 const NodeView = styled.div`
   width: 50px;

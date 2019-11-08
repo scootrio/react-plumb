@@ -8,7 +8,7 @@ import initialState, { genid, endpoints } from './state';
 
 function Container() {
   const [state, setState] = useState(initialState);
-  console.log('Rendering Container with state', state);
+
   const onDrop = data =>
     setState(prev => ({
       connections: [...prev.connections],
