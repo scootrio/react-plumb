@@ -2,31 +2,22 @@ import React, { useRef, useState, useEffect, cloneElement, createElement } from 
 import { jsPlumb } from 'jsplumb';
 import uuid from 'uuid/v4';
 
-export function withEndpoints(endpoints) {
-  return function(Component) {
-    // We just need to wrap it in a new component that we can set default properties on (maintain immutability, pure
-    // functions)
-    function ComponentWithEndpoints(props) {
-      return createElement(Component, props);
-    }
-
-    // We apply the endpoints to the default props so that
-    //
-    // 1) the developer doesn't need to explicitly include the prop when using the component, and
-    // 2) while doing so, the endpoints will be visible to the `usePlumbContainer()` hook
-    //
-    // This comes with the added advantage that, if the developer needs to override endpoint settings for certain
-    // instances, they can by passing in an `endpoints` property to the component.
-    ComponentWithEndpoints.defaultProps = {
-      endpoints
-    };
-
-    return ComponentWithEndpoints;
-  };
-}
-
+/**
+ * Hook for applying jsPlumb functionality to a container component. The container will use an isolated instance of
+ * jsPlumb.
+ *
+ * @param {Object} [options] Options used to configure the hook behavior.
+ * @returns {[React.MutableRefObject<undefined>, Function]} the reference used to initialze the container and the
+ * `plumb()` function used to bind jsPlumb functionality to the rendered child nodes.
+ */
 export function usePlumbContainer(options = {}) {
+  // Our reference to the container DOM element. We use this to scope the jsPlumb instance to the container.
   const ref = useRef();
+  useEffect(() => {
+    instance.setContainer(ref.current);
+  }, [ref]);
+
+  // State required for jsPlumb
   const instance = useState(jsPlumb.getInstance())[0];
   const [bound, setBound] = useState(false);
   const initializedNodes = useState({})[0];
@@ -123,6 +114,10 @@ export function usePlumbContainer(options = {}) {
     setBound(true);
   }
 
+  /**
+   *
+   *
+   */
   function plumb(children) {
     let childrenArray = React.Children.toArray(children);
 
@@ -158,7 +153,6 @@ export function usePlumbContainer(options = {}) {
         }
       }
 
-      instance.setContainer(ref.current);
       childrenArray.forEach(init);
 
       // Now that all the nodes have been initialized, we can draw any initial connections we received
@@ -200,7 +194,7 @@ export function usePlumbContainer(options = {}) {
       // In this case, we do need to unregister inside the react lifecycle. We will need some logic here for
       // determining how to do this.
       //
-    }, [ref, childrenArray]);
+    }, [childrenArray]);
 
     function intercept(child) {
       let id = child.props.id;
@@ -278,8 +272,6 @@ function _remove(info, affectedElements, instance) {
     }
     instance.anchorManager.clearFor(_info.id);
 
-    // TODO: decide how to handle connection
-    // Most likely we will use a React state object to programatically add/remove connections
     instance.anchorManager.removeFloatingConnection(_info.id);
 
     if (instance.isSource(_info.el)) {
