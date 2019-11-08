@@ -9,21 +9,14 @@
  * to the anchor (value of 0, 1, or -1). Visually the setup looks like this:
  *
  * ```
- *    0                         1
- * 0  - - - - - - - - - - - - - -    x
- *    - oooooooooooooooooooooooo
- *    - oooooooooooooooooooooooo
- *    - oooooooooooooooooooooooo------> dx = 1, dy = 0
- *    - oooooooooooooooooooooooo
- *    - oooooooooooooooooooooooo
- *    - oooooooooooooooooooooooo
- *    - oooooooooooooooooooooooo
- *    - oooooooooooooooooooooooo
- * 1  - oooooooooooooooooooooooo
- *                       |
- *    y                  |
- *                       V
- *                  dx = 0, dy = 1
+ *    0       1
+ * 0  - - - - - x
+ *    - o o o o
+ *    - o o o o
+ * 1  - o o o o --> dx = 1, dy = 0
+ *    y       |
+ *            V
+ *      dx = 0, dy = 1
  * ```
  *
  * Where all `o` marks represent the node being drawn.
