@@ -14,7 +14,7 @@ const targetEndpoint = () => ({
   uuid: genid()
 });
 
-const endpoints = () => [targetEndpoint(), sourceEndpoint()];
+export const endpoints = () => [targetEndpoint(), sourceEndpoint()];
 
 const connectionSource = sourceEndpoint();
 

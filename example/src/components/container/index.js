@@ -4,7 +4,7 @@ import useDrop from '../../hooks/useDrop';
 import usePlumbContainer from 'react-plumb';
 import Node from './node';
 import './plumb-styles.css';
-import initialState, { genid } from './state';
+import initialState, { genid, endpoints } from './state';
 
 function Container() {
   const [state, setState] = useState(initialState);
@@ -17,7 +17,8 @@ function Container() {
         {
           id: genid(),
           x: data.x,
-          y: data.y
+          y: data.y,
+          endpoints: endpoints()
         }
       ]
     }));
