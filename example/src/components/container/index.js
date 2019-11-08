@@ -53,6 +53,9 @@ function Container() {
         return { ...prev, connections };
       });
     },
+    onConnectionDrag: pendingConnection => {
+      console.log(pendingConnection);
+    },
     connections: state.connections
   });
 

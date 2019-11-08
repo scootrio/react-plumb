@@ -4,14 +4,16 @@ const sourceEndpoint = () => ({
   connector: 'Flowchart',
   anchor: 'Right',
   isSource: true,
-  uuid: genid()
+  uuid: genid(),
+  scope: 'test'
 });
 
 const targetEndpoint = () => ({
   connector: 'Flowchart',
   anchor: 'Left',
   isTarget: true,
-  uuid: genid()
+  uuid: genid(),
+  scope: 'test test1'
 });
 
 export const endpoints = () => [targetEndpoint(), sourceEndpoint()];

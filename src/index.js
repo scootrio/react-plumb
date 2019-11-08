@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, cloneElement, createElement } from 'react';
+import React, { useRef, useState, useEffect, cloneElement } from 'react';
 import { jsPlumb } from 'jsplumb';
 import uuid from 'uuid/v4';
 
@@ -15,6 +15,7 @@ export function usePlumbContainer(options = {}) {
   const ref = useRef();
   useEffect(() => {
     instance.setContainer(ref.current);
+    instance.setDefaultScope('default');
   }, [ref]);
 
   // State required for jsPlumb
@@ -78,19 +79,20 @@ export function usePlumbContainer(options = {}) {
         // We need to get the old connection ID before calling the disconnect callback, and then we need to construct
         // a new connection to pass to the onConnect callback. Behind the scenes we simply do an ID swap on the jsPlumb
         // connection object.
+        let oldConn = {
+          id: info.connection.id,
+          scope: info.connection.scope,
+          source: {
+            id: info.originalSourceId,
+            endpoint: info.originalSourceEndpoint.getUuid()
+          },
+          target: {
+            id: info.originalTargetId,
+            endpoint: info.originalTargetEndpoint.getUuid()
+          }
+        };
+        info.connection.id = uuid();
         let newConn = _connection(info.connection);
-        let oldConn = { ...newConn };
-        newConn.id = uuid();
-        info.connection.id = newConn.id;
-        if (info.index === 0) {
-          // Source changed
-          oldConn.source.id = info.originalSourceId;
-          oldConn.source.endpoint = info.originalSourceEndpoint.getUuid();
-        } else {
-          // Target Changed
-          oldConn.target.id = info.originalTargetId;
-          oldConn.target.endpoint = info.originalTargetEndpoint.getUuid();
-        }
 
         delete initializedConnections[oldConn.id];
         initializedConnections[newConn.id] = true;
@@ -101,22 +103,60 @@ export function usePlumbContainer(options = {}) {
       }
     });
 
-    // Scope logic.
+    // Bind to the dragging of a new and existing connections
     //
-    // jsPlumb offers 'connection' and 'connectionMoved' events that we could bind to, but these are fired after jsPlumb
-    // has already manipulated the DOM. We want React to have exclusive rights to the DOM, so we need to intercept the
-    // creation of a connection by jsPlumb and instead modify state so that React can update the DOM.
-    instance.bind('beforeDrop', info => {
-      // TODO: scopes
-      return true;
-    });
+    function connectionDrag(info) {
+      if (options.onConnectionDrag) {
+        let candidates = [];
+        instance.selectEndpoints({ scope: info.endpoint.scope }).each(endpoint => {
+          candidates.push({
+            id: endpoint.elementId,
+            endpoint: endpoint.getUuid()
+          });
+        });
+        let pendingConnection = {
+          candidates
+        };
+        if (info.connection) {
+          // Dealing with an existing connection
+          if (info.connection.endpoints[0].elementId === info.sourceId) {
+            // The source is being changed
+            pendingConnection.scope = info.connection.endpoints[1].scope;
+            pendingConnection.source = null;
+            pendingConnection.target = {
+              id: info.connection.endpoints[1].elementId,
+              endpoint: info.connection.endpoints[1].getUuid()
+            };
+          } else {
+            // The target is being changed
+            pendingConnection.scope = info.connection.endpoints[0].scope;
+            pendingConnection.source = {
+              id: info.connection.endpoints[0].elementId,
+              endpoint: info.connection.endpoints[0].getUuid()
+            };
+            pendingConnection.target = null;
+          }
+        } else {
+          // Dealing with a new connection
+          pendingConnection.source = {
+            id: info.sourceId,
+            endpoint: info.endpoint.getUuid()
+          };
+          pendingConnection.target = null;
+        }
+        options.onConnectionDrag(pendingConnection);
+      }
+    }
+    instance.bind('beforeDrag', connectionDrag);
+    instance.bind('beforeStartDetach', connectionDrag);
 
     setBound(true);
   }
 
   /**
+   * Initializes the child components of a plumb container to be used as the node elements in jsPlumb.
    *
-   *
+   * @param {React.Component|React.Component[]} [children] the child components representing the nodes in jsPlumb
    */
   function plumb(children) {
     let childrenArray = React.Children.toArray(children);
@@ -156,6 +196,10 @@ export function usePlumbContainer(options = {}) {
       childrenArray.forEach(init);
 
       // Now that all the nodes have been initialized, we can draw any initial connections we received
+      //
+      // Notice that we cannot separate the initialization of the nodes and connections into two separate `useEffect()`
+      // calls because we have a strict requirement on the order of initialization.
+      //
       if (options.connections) {
         // TODO: figure out the performance implications of this approach. How do we improve it?
         // We first need to remove all of the old connections. This is important for cases where a connection has been
@@ -194,9 +238,16 @@ export function usePlumbContainer(options = {}) {
       // In this case, we do need to unregister inside the react lifecycle. We will need some logic here for
       // determining how to do this.
       //
-    }, [childrenArray]);
+    }, [childrenArray, options, initializedConnections, initializedNodes]);
 
-    function intercept(child) {
+    /**
+     * Intercepts the `onRemove` callback registered by the child's parent component and performs logic necessary for
+     * preventing memory leaks in jsPlumb.
+     *
+     * @param {React.Component} child A single child component of the jsPlumb container.
+     * @returns {React.Component} A clone of the old component with the `onRemove` property intercepted and extended.
+     */
+    function interceptOnRemoveNode(child) {
       let id = child.props.id;
       return cloneElement(child, {
         onRemove: () => {
@@ -230,8 +281,7 @@ export function usePlumbContainer(options = {}) {
         }
       });
     }
-
-    return childrenArray.map(intercept);
+    return childrenArray.map(interceptOnRemoveNode);
   }
 
   return [ref, plumb];
@@ -304,6 +354,7 @@ function _remove(info, affectedElements, instance) {
 function _connection(connection) {
   return {
     id: connection.id,
+    scope: connection.scope,
     source: {
       id: connection.sourceId,
       endpoint: connection.endpoints[0].getUuid()
