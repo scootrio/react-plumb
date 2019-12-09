@@ -20,138 +20,170 @@ export function usePlumbContainer(options = {}) {
 
   // State required for jsPlumb
   const instance = useState(jsPlumb.getInstance())[0];
-  const [bound, setBound] = useState(false);
   const initializedNodes = useState({})[0];
   const initializedConnections = useState({})[0];
   const moved = useRef(false);
 
-  if (!bound) {
-    // Bind to new connections
-    //
-    instance.bind('connection', (info, ev) => {
-      if (ev) {
-        if (moved.current) {
-          moved.current = false;
-          return;
-        }
-        info.connection.id = uuid();
-        info.connection.idPrefix = '';
-        let conn = _connection(info.connection);
+  // Unbind all previous handlers and bind new ones. We have to do this due to the update nature of
+  // React. If we don't rebind on every call, then functions passed by the developer that rely on old state
+  // values in their environment will never be updated to use the new environment. This should not
+  // introduce a significant performance impact.
+  //
+  instance.unbind();
 
-        initializedConnections[conn.id] = true;
+  function _maybeStopEvent(ev) {
+    if (options.stopEvents) {
+      ev.stopPropagation();
+      ev.preventDefault();
+    }
+  }
 
-        if (options.onConnect) {
-          options.onConnect(conn);
-        }
-      }
-    });
-
-    // Bind to disconnect
-    //
-    instance.bind('connectionDetached', (info, ev) => {
-      if (ev) {
-        if (moved.current) {
-          moved.current = false;
-          return;
-        }
-        let conn = _connection(info.connection);
-
-        delete initializedConnections[conn.id];
-
-        if (options.onDisconnect) {
-          options.onDisconnect(conn);
-        }
-      }
-    });
-
-    // Bind to a connection move event
-    //
-    instance.bind('connectionMoved', (info, ev) => {
-      if (ev) {
-        moved.current = true;
-        // Invoke the connect and disconnect callbacks from here.
-        //
-        // For jsPlumb, the "new" connection resulting from the move is not actually new. An existing connection
-        // simply had it's endpoint changed. This is not how we want to represent a moved connection. We want a moved
-        // connection to mimic the destruction of an old connection and the creation of a new connection. This means
-        // that each connection will have two completely different IDs.
-        //
-        // We need to get the old connection ID before calling the disconnect callback, and then we need to construct
-        // a new connection to pass to the onConnect callback. Behind the scenes we simply do an ID swap on the jsPlumb
-        // connection object.
-        let oldConn = {
-          id: info.connection.id,
-          scope: info.connection.scope,
-          source: {
-            id: info.originalSourceId,
-            endpoint: info.originalSourceEndpoint.getUuid()
-          },
-          target: {
-            id: info.originalTargetId,
-            endpoint: info.originalTargetEndpoint.getUuid()
-          }
-        };
-        info.connection.id = uuid();
-        let newConn = _connection(info.connection);
-
-        delete initializedConnections[oldConn.id];
-        initializedConnections[newConn.id] = true;
-
-        if (options.onConnectionMoved) {
-          options.onConnectionMoved(oldConn, newConn);
-        }
-      }
-    });
-
-    // Bind to the dragging of a new and existing connections
-    //
-    function connectionDrag(info) {
-      if (options.onConnectionDrag) {
-        let candidates = [];
-        instance.selectEndpoints({ scope: info.endpoint.scope }).each(endpoint => {
-          candidates.push({
-            id: endpoint.elementId,
-            endpoint: endpoint.getUuid()
-          });
+  function _bindConnectionHandlers(jsPlumbConn) {
+    // Allow handlers to be bound to connections
+    if (options.connectionHandlers) {
+      let handlers = options.connectionHandlers;
+      if (handlers.onClick) {
+        jsPlumbConn.bind('click', (_, ev) => {
+          _maybeStopEvent(ev);
+          handlers.onClick(_connection(jsPlumbConn), jsPlumbConn);
         });
-        let pendingConnection = {
-          candidates
-        };
-        if (info.connection) {
-          // Dealing with an existing connection
-          if (info.connection.endpoints[0].elementId === info.sourceId) {
-            // The source is being changed
-            pendingConnection.scope = info.connection.endpoints[1].scope;
-            pendingConnection.source = null;
-            pendingConnection.target = {
-              id: info.connection.endpoints[1].elementId,
-              endpoint: info.connection.endpoints[1].getUuid()
-            };
-          } else {
-            // The target is being changed
-            pendingConnection.scope = info.connection.endpoints[0].scope;
-            pendingConnection.source = {
-              id: info.connection.endpoints[0].elementId,
-              endpoint: info.connection.endpoints[0].getUuid()
-            };
-            pendingConnection.target = null;
-          }
+      }
+    }
+  }
+
+  // Bind to new connections
+  //
+  instance.bind('connection', (info, ev) => {
+    if (ev) {
+      if (moved.current) {
+        moved.current = false;
+        return;
+      }
+      info.connection.id = uuid();
+      info.connection.idPrefix = '';
+      let conn = _connection(info.connection);
+
+      // Allow handlers to be bound to connections
+      _bindConnectionHandlers(info.connection);
+
+      initializedConnections[conn.id] = true;
+
+      if (options.onConnect) {
+        options.onConnect(conn, info.connection);
+      }
+    }
+  });
+
+  // We also need to re-bind the handlers on existing connections so that they are using the latest state
+  //
+  instance.getAllConnections().forEach(c => {
+    c.unbind();
+    _bindConnectionHandlers(c);
+  });
+
+  // Bind to disconnect
+  //
+  instance.bind('connectionDetached', (info, ev) => {
+    if (ev) {
+      if (moved.current) {
+        moved.current = false;
+        return;
+      }
+      let conn = _connection(info.connection);
+
+      delete initializedConnections[conn.id];
+
+      if (options.onDisconnect) {
+        options.onDisconnect(conn);
+      }
+    }
+  });
+
+  // Bind to a connection move event
+  //
+  instance.bind('connectionMoved', (info, ev) => {
+    if (ev) {
+      moved.current = true;
+      // Invoke the connect and disconnect callbacks from here.
+      //
+      // For jsPlumb, the "new" connection resulting from the move is not actually new. An existing connection
+      // simply had it's endpoint changed. This is not how we want to represent a moved connection. We want a moved
+      // connection to mimic the destruction of an old connection and the creation of a new connection. This means
+      // that each connection will have two completely different IDs.
+      //
+      // We need to get the old connection ID before calling the disconnect callback, and then we need to construct
+      // a new connection to pass to the onConnect callback. Behind the scenes we simply do an ID swap on the jsPlumb
+      // connection object.
+      let oldConn = {
+        id: info.connection.id,
+        scope: info.connection.scope,
+        source: {
+          id: info.originalSourceId,
+          endpoint: info.originalSourceEndpoint.getUuid()
+        },
+        target: {
+          id: info.originalTargetId,
+          endpoint: info.originalTargetEndpoint.getUuid()
+        }
+      };
+      info.connection.id = uuid();
+      let newConn = _connection(info.connection);
+
+      delete initializedConnections[oldConn.id];
+      initializedConnections[newConn.id] = true;
+
+      if (options.onConnectionMoved) {
+        options.onConnectionMoved(oldConn, newConn);
+      }
+    }
+  });
+
+  // Bind to the dragging of a new and existing connections
+  //
+  function connectionDrag(info) {
+    if (options.onConnectionDrag) {
+      let candidates = [];
+      instance.selectEndpoints({ scope: info.endpoint.scope }).each(endpoint => {
+        candidates.push({
+          id: endpoint.elementId,
+          endpoint: endpoint.getUuid()
+        });
+      });
+      let pendingConnection = {
+        candidates
+      };
+      if (info.connection) {
+        // Dealing with an existing connection
+        if (info.connection.endpoints[0].elementId === info.sourceId) {
+          // The source is being changed
+          pendingConnection.scope = info.connection.endpoints[1].scope;
+          pendingConnection.source = null;
+          pendingConnection.target = {
+            id: info.connection.endpoints[1].elementId,
+            endpoint: info.connection.endpoints[1].getUuid()
+          };
         } else {
-          // Dealing with a new connection
+          // The target is being changed
+          pendingConnection.scope = info.connection.endpoints[0].scope;
           pendingConnection.source = {
-            id: info.sourceId,
-            endpoint: info.endpoint.getUuid()
+            id: info.connection.endpoints[0].elementId,
+            endpoint: info.connection.endpoints[0].getUuid()
           };
           pendingConnection.target = null;
         }
-        options.onConnectionDrag(pendingConnection);
+      } else {
+        // Dealing with a new connection
+        pendingConnection.source = {
+          id: info.sourceId,
+          endpoint: info.endpoint.getUuid()
+        };
+        pendingConnection.target = null;
       }
+      options.onConnectionDrag(pendingConnection);
     }
-    instance.bind('beforeDrag', connectionDrag);
-    instance.bind('beforeStartDetach', connectionDrag);
-
-    setBound(true);
   }
+  instance.bind('beforeDrag', connectionDrag);
+  instance.bind('beforeStartDetach', connectionDrag);
 
   /**
    * Initializes the child components of a plumb container to be used as the node elements in jsPlumb.
