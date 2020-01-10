@@ -243,7 +243,8 @@ export function usePlumbContainer(options = {}) {
         // moved so we don't cause errors by exceeding the maximum number of connections on a re-render.
         let currentConnections = {};
         Object.values(options.connections).forEach(c => {
-          currentConnections[c.id] = c;
+          let conn = options.connectionPropPath ? _destructureToPlumbProps(c, options.connectionPropPath) : c;
+          currentConnections[conn.id] = conn;
         });
         Object.keys(initializedConnections).forEach(id => {
           if (!currentConnections[id]) {
@@ -254,7 +255,8 @@ export function usePlumbContainer(options = {}) {
           }
         });
 
-        options.connections.forEach(conn => {
+        options.connections.forEach(c => {
+          let conn = options.connectionPropPath ? _destructureToPlumbProps(c, options.connectionPropPath) : c;
           let id = conn.id;
           if (!initializedConnections[id]) {
             let newConnection = instance.connect({
@@ -401,4 +403,13 @@ function _connection(connection) {
       endpoint: connection.endpoints[1].getUuid()
     }
   };
+}
+
+function _destructureToPlumbProps(obj, path) {
+  let props = null;
+  path.split('.').forEach(function(part) {
+    if (props === null) props = obj[part];
+    else props = props[part];
+  });
+  return props;
 }

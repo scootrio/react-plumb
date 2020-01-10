@@ -80,6 +80,21 @@ If the endpoint in a connection is undefined, then the "default" endpoint will b
 
 Connections are the trickiest part because their visual representation is created by jsPlumb. The way we handle this is by intercepting the drop handler and determining for ourselves if it is a legal connection. If the answer is yes, a callback is fired and state is expected to change. If the answer is no, the callback will not be fired and jsPlumb will halt trying to render the connection. In order for this to work, **all connections must have a unique identifier**.
 
+#### Connection Property Path
+It may be the case that, on the connection object used in the `react-plumb` connection logic, the above properties do not exist at the root of the connection object. For example, say in your application you want to separate the app data from data needed by some other process (such as the server) so you structure your connection object as follows:
+
+```js
+const conn = {
+    meta: {
+        // jsPlumb connection props
+    },
+    config: {
+        // Your application data
+    }
+}
+```
+
+In order for `react-plumb` to work, you need to tell it where to look for the proper object properties. You can do this by specifying a `connectionPropPath` in the options when calling `usePlumbContainer`.
 
 ## Scopes
 Should be able to restrict connections to matching scopes (or a list of scopes). If a scope is specified, scopes must match for a connection to be successful. There is an `onDropMismatchedScope()` callback that can be registered that is called when scopes are defined and a connection is attempted between mismatching scopes. This allows alerts, notifications, or other cleanup to occur on the part of the developer.
