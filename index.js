@@ -71,6 +71,8 @@ export function usePlumbContainer(options = {}) {
       if (options.onConnect) {
         options.onConnect(conn, info.connection);
       }
+
+      _maybeStopEvent(ev);
     }
   });
 
@@ -96,6 +98,8 @@ export function usePlumbContainer(options = {}) {
       if (options.onDisconnect) {
         options.onDisconnect(conn);
       }
+
+      _maybeStopEvent(ev);
     }
   });
 
@@ -135,12 +139,14 @@ export function usePlumbContainer(options = {}) {
       if (options.onConnectionMoved) {
         options.onConnectionMoved(oldConn, newConn);
       }
+
+      _maybeStopEvent(ev);
     }
   });
 
   // Bind to the dragging of a new and existing connections
   //
-  function connectionDrag(info) {
+  function connectionDrag(info, ev) {
     if (options.onConnectionDrag) {
       let candidates = [];
       instance.selectEndpoints({ scope: info.endpoint.scope }).each(endpoint => {
@@ -181,6 +187,9 @@ export function usePlumbContainer(options = {}) {
       }
       options.onConnectionDrag(pendingConnection);
     }
+    if (ev) {
+      _maybeStopEvent(ev);
+    }
   }
   instance.bind('beforeDrag', connectionDrag);
   instance.bind('beforeStartDetach', connectionDrag);
@@ -217,7 +226,8 @@ export function usePlumbContainer(options = {}) {
                 const [x, y] = e.finalPos;
                 options.onDragStop(id, x, y);
               }
-            }
+            },
+            grid: options.dragGrid
           });
 
           // Add any endpoints specified in the properties of the child
