@@ -55,6 +55,7 @@ export function usePlumbContainer(options = {}) {
   //
   instance.bind('connection', (info, ev) => {
     if (ev) {
+      _maybeStopEvent(ev);
       if (moved.current) {
         moved.current = false;
         return;
@@ -71,8 +72,6 @@ export function usePlumbContainer(options = {}) {
       if (options.onConnect) {
         options.onConnect(conn, info.connection);
       }
-
-      _maybeStopEvent(ev);
     }
   });
 
@@ -87,6 +86,7 @@ export function usePlumbContainer(options = {}) {
   //
   instance.bind('connectionDetached', (info, ev) => {
     if (ev) {
+      _maybeStopEvent(ev);
       if (moved.current) {
         moved.current = false;
         return;
@@ -98,8 +98,6 @@ export function usePlumbContainer(options = {}) {
       if (options.onDisconnect) {
         options.onDisconnect(conn);
       }
-
-      _maybeStopEvent(ev);
     }
   });
 
@@ -107,6 +105,7 @@ export function usePlumbContainer(options = {}) {
   //
   instance.bind('connectionMoved', (info, ev) => {
     if (ev) {
+      _maybeStopEvent(ev);
       moved.current = true;
       // Invoke the connect and disconnect callbacks from here.
       //
@@ -139,14 +138,15 @@ export function usePlumbContainer(options = {}) {
       if (options.onConnectionMoved) {
         options.onConnectionMoved(oldConn, newConn);
       }
-
-      _maybeStopEvent(ev);
     }
   });
 
   // Bind to the dragging of a new and existing connections
   //
   function connectionDrag(info, ev) {
+    if (ev) {
+      _maybeStopEvent(ev);
+    }
     if (options.onConnectionDrag) {
       let candidates = [];
       instance.selectEndpoints({ scope: info.endpoint.scope }).each(endpoint => {
@@ -186,9 +186,6 @@ export function usePlumbContainer(options = {}) {
         pendingConnection.target = null;
       }
       options.onConnectionDrag(pendingConnection);
-    }
-    if (ev) {
-      _maybeStopEvent(ev);
     }
   }
   instance.bind('beforeDrag', connectionDrag);
