@@ -285,8 +285,6 @@ export function usePlumbContainer(options = {}) {
             initializedConnections[id] = newConnection;
           } else if (options.createLabel) {
             // The connection is already registered with jsPlumb, but the label may have changed. Replace it
-            let name = _createOverlayLabelName(id);
-            console.log(name);
             initializedConnections[id].removeOverlay(_createOverlayLabelName(id));
             _addLabelToConnection(initializedConnections[id], options.createLabel);
           }
