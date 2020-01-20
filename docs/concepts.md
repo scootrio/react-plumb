@@ -70,7 +70,8 @@ const conn = {
     target: {
         id: "",
         endpoint: ""
-    }
+    },
+    label: ""
     // Additional jsPlumb configuration goes here
     // ...
 }

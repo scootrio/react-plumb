@@ -60,14 +60,23 @@ export function usePlumbContainer(options = {}) {
         moved.current = false;
         return;
       }
-      info.connection.id = uuid();
+
+      let id = uuid();
+
+      // Add an empty label to the new connection
+      info.connection.addOverlay([
+        'Label',
+        { label: '', location: 0.5, id: _createOverlayLabelName(id), cssClass: 'react-plumb-label' }
+      ]);
+
+      info.connection.id = id;
       info.connection.idPrefix = '';
       let conn = _connection(info.connection);
 
       // Allow handlers to be bound to connections
       _bindConnectionHandlers(info.connection);
 
-      initializedConnections[conn.id] = true;
+      initializedConnections[id] = info.connection;
 
       if (options.onConnect) {
         options.onConnect(conn, info.connection);
@@ -267,11 +276,29 @@ export function usePlumbContainer(options = {}) {
           let id = conn.id;
           if (!initializedConnections[id]) {
             let newConnection = instance.connect({
-              uuids: [conn.source.endpoint, conn.target.endpoint]
+              uuids: [conn.source.endpoint, conn.target.endpoint],
+              overlays: [
+                [
+                  'Label',
+                  {
+                    label: conn.label || '',
+                    location: 0.5,
+                    id: _createOverlayLabelName(conn.id),
+                    cssClass: 'react-plumb-label'
+                  }
+                ]
+              ]
             });
             newConnection.id = id;
             newConnection.idPrefix = '';
-            initializedConnections[id] = true;
+            initializedConnections[id] = newConnection;
+          } else if (conn.label) {
+            // The connection is already registered with jsPlumb, but the label may have changed. Check if we need
+            // to update the label
+            let overlay = initializedConnections[id].getOverlay(_createOverlayLabelName(conn.id));
+            if (overlay.getLabel() !== conn.label) {
+              overlay.setLabel(conn.label);
+            }
           }
         });
       }
@@ -410,6 +437,10 @@ function _connection(connection) {
       endpoint: connection.endpoints[1].getUuid()
     }
   };
+}
+
+function _createOverlayLabelName(id) {
+  return 'label-' + id;
 }
 
 function _destructureToPlumbProps(obj, path) {
