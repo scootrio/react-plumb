@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect, cloneElement } from 'react';
+import { render } from 'react-dom';
 import { jsPlumb } from 'jsplumb';
 import uuid from 'uuid/v4';
 
@@ -63,12 +64,6 @@ export function usePlumbContainer(options = {}) {
 
       let id = uuid();
 
-      // Add an empty label to the new connection
-      info.connection.addOverlay([
-        'Label',
-        { label: '', location: 0.5, id: _createOverlayLabelName(id), cssClass: 'react-plumb-label' }
-      ]);
-
       info.connection.id = id;
       info.connection.idPrefix = '';
       let conn = _connection(info.connection);
@@ -80,6 +75,10 @@ export function usePlumbContainer(options = {}) {
 
       if (options.onConnect) {
         options.onConnect(conn, info.connection);
+      }
+
+      if (options.createLabel) {
+        _addLabelToConnection(info.connection, options.createLabel);
       }
     }
   });
@@ -276,29 +275,20 @@ export function usePlumbContainer(options = {}) {
           let id = conn.id;
           if (!initializedConnections[id]) {
             let newConnection = instance.connect({
-              uuids: [conn.source.endpoint, conn.target.endpoint],
-              overlays: [
-                [
-                  'Label',
-                  {
-                    label: conn.label || '',
-                    location: 0.5,
-                    id: _createOverlayLabelName(conn.id),
-                    cssClass: 'react-plumb-label'
-                  }
-                ]
-              ]
+              uuids: [conn.source.endpoint, conn.target.endpoint]
             });
             newConnection.id = id;
             newConnection.idPrefix = '';
-            initializedConnections[id] = newConnection;
-          } else if (conn.label) {
-            // The connection is already registered with jsPlumb, but the label may have changed. Check if we need
-            // to update the label
-            let overlay = initializedConnections[id].getOverlay(_createOverlayLabelName(conn.id));
-            if (overlay.getLabel() !== conn.label) {
-              overlay.setLabel(conn.label);
+            if (options.createLabel) {
+              _addLabelToConnection(newConnection, options.createLabel);
             }
+            initializedConnections[id] = newConnection;
+          } else if (options.createLabel) {
+            // The connection is already registered with jsPlumb, but the label may have changed. Replace it
+            let name = _createOverlayLabelName(id);
+            console.log(name);
+            initializedConnections[id].removeOverlay(_createOverlayLabelName(id));
+            _addLabelToConnection(initializedConnections[id], options.createLabel);
           }
         });
       }
@@ -450,4 +440,36 @@ function _destructureToPlumbProps(obj, path) {
     else props = props[part];
   });
   return props;
+}
+
+function _addLabelToConnection(conn, createLabel) {
+  let Label = createLabel(conn.id);
+  if (Label) {
+    if (React.isValidElement(Label)) {
+      conn.addOverlay([
+        'Custom',
+        {
+          create: function() {
+            let root = document.createElement('div');
+            render(Label, root);
+            return root;
+          },
+          id: _createOverlayLabelName(conn.id)
+        }
+      ]);
+    } else if (typeof Label === 'string') {
+      conn.addOverlay([
+        'Label',
+        { label: Label, location: 0.5, id: _createOverlayLabelName(conn.id), cssClass: 'react-plumb-label' }
+      ]);
+    } else {
+      throw new Error(
+        'Got invalid return type from `createLabel`: an overlay label must either be a string or ' +
+          'a react component. Instead, it returned "' +
+          Label.toString() +
+          '", which is of type ' +
+          typeof Label
+      );
+    }
+  }
 }
