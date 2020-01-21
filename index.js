@@ -284,9 +284,11 @@ export function usePlumbContainer(options = {}) {
             }
             initializedConnections[id] = newConnection;
           } else if (options.createLabel) {
-            // The connection is already registered with jsPlumb, but the label may have changed. Replace it
-            initializedConnections[id].removeOverlay(_createOverlayLabelName(id));
-            _addLabelToConnection(initializedConnections[id], options.createLabel);
+            // The connection is already registered with jsPlumb, but the label may have changed. Replace it.
+            if (initializedConnections[id].getOverlay(_createOverlayLabelName(id))) {
+              initializedConnections[id].removeOverlay(_createOverlayLabelName(id));
+              _addLabelToConnection(initializedConnections[id], options.createLabel);
+            }
           }
         });
       }
