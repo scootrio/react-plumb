@@ -451,6 +451,8 @@ function _addLabelToConnection(conn, createLabel) {
         {
           create: function() {
             let root = document.createElement('div');
+            root.style.position = 'relative';
+            root.style.zIndex = '100';
             render(Label, root);
             return root;
           },
