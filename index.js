@@ -257,7 +257,7 @@ export function usePlumbContainer(options = {}) {
         // We first need to remove all of the old connections. This is important for cases where a connection has been
         // moved so we don't cause errors by exceeding the maximum number of connections on a re-render.
         let currentConnections = {};
-        Object.values(options.connections).forEach(c => {
+        options.connections.forEach(c => {
           let conn = options.connectionPropPath ? _destructureToPlumbProps(c, options.connectionPropPath) : c;
           currentConnections[conn.id] = conn;
         });
@@ -443,7 +443,7 @@ function _destructureToPlumbProps(obj, path) {
 }
 
 function _addLabelToConnection(conn, createLabel) {
-  let Label = createLabel(conn.id);
+  let Label = createLabel(conn.id, conn);
   if (Label) {
     if (React.isValidElement(Label)) {
       conn.addOverlay([
