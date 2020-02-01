@@ -49,6 +49,13 @@ export function usePlumbContainer(options = {}) {
           handlers.onClick(_connection(jsPlumbConn), jsPlumbConn);
         });
       }
+
+      if(handlers.onContextMenu) {
+        jsPlumbConn.bind('contextmenu', function(_, ev){
+          _maybeStopEvent(ev);
+          handlers.onContextMenu(_connection(jsPlumbConn), jsPlumbConn);
+        });
+      }
     }
   }
 
