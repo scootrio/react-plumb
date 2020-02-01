@@ -50,8 +50,8 @@ export function usePlumbContainer(options = {}) {
         });
       }
 
-      if(handlers.onContextMenu) {
-        jsPlumbConn.bind('contextmenu', function(_, ev){
+      if (handlers.onContextMenu) {
+        jsPlumbConn.bind('contextmenu', function(_, ev) {
           _maybeStopEvent(ev);
           handlers.onContextMenu(_connection(jsPlumbConn), jsPlumbConn);
         });
@@ -260,27 +260,40 @@ export function usePlumbContainer(options = {}) {
       // calls because we have a strict requirement on the order of initialization.
       //
       if (options.connections) {
-        // TODO: figure out the performance implications of this approach. How do we improve it?
         // We first need to remove all of the old connections. This is important for cases where a connection has been
         // moved so we don't cause errors by exceeding the maximum number of connections on a re-render.
-        let currentConnections = {};
-        options.connections.forEach(c => {
+
+        // Step 1: Create an object we can use to track the initialization of the current connections provided in the
+        //         `options` object.
+        //
+        const currentConnections = {};
+        for (const c of options.connections) {
           let conn = options.connectionPropPath ? _destructureToPlumbProps(c, options.connectionPropPath) : c;
           currentConnections[conn.id] = conn;
-        });
-        Object.keys(initializedConnections).forEach(id => {
-          if (!currentConnections[id]) {
-            // The connection has been removed
-            let conn = instance.getConnections().filter(c => c.id === id)[0];
-            instance.deleteConnection(conn, { force: true });
-            delete initializedConnections[id];
-          }
-        });
+        }
 
-        options.connections.forEach(c => {
-          let conn = options.connectionPropPath ? _destructureToPlumbProps(c, options.connectionPropPath) : c;
-          let id = conn.id;
-          if (!initializedConnections[id]) {
+        // Step 2: Loop over all of the connections currently registered with jsPlumb. These are the same as the ones
+        //         in our initialized connections. If one of these connections does not have a key in the
+        //         `currentConnections` object, remove it. If the connection does still exist, indicate it by marking
+        //         the value in `currentConnections` to `null` and then update the label if we need to.
+        for (const c of Object.values(initializedConnections)) {
+          if (!currentConnections[c.id]) {
+            instance.deleteConnection(c, { force: true });
+            delete initializedConnections[c.id];
+          } else {
+            currentConnections[c.id] = null;
+            if (options.createLabel) {
+              c.removeOverlay(_createOverlayLabelName(c.id));
+              _addLabelToConnection(c, options.createLabel);
+            }
+          }
+        }
+
+        // Step 3: Loop back over our current connections and initialize any ones that were not already initialized and
+        //         registered with jsPlumb. This adds new connections.
+        //
+        for (const [id, conn] of Object.entries(currentConnections)) {
+          if (conn) {
             let newConnection = instance.connect({
               uuids: [conn.source.endpoint, conn.target.endpoint]
             });
@@ -290,14 +303,8 @@ export function usePlumbContainer(options = {}) {
               _addLabelToConnection(newConnection, options.createLabel);
             }
             initializedConnections[id] = newConnection;
-          } else if (options.createLabel) {
-            // The connection is already registered with jsPlumb, but the label may have changed. Replace it.
-            if (initializedConnections[id].getOverlay(_createOverlayLabelName(id))) {
-              initializedConnections[id].removeOverlay(_createOverlayLabelName(id));
-              _addLabelToConnection(initializedConnections[id], options.createLabel);
-            }
           }
-        });
+        }
       }
 
       // NOTE: we don't need to worry about clean-up when the container component unmounts. As long as each
@@ -334,15 +341,7 @@ export function usePlumbContainer(options = {}) {
             // React will take care of the DOM for us, but we need to unregister everything associated with
             // the element we are removing from jsPlumb.
             //
-            let conns = [...instance.getConnections({ source: id }), ...instance.getConnections({ target: id })].map(
-              _connection
-            );
-            _unregister(id, instance);
-            delete initializedNodes[id];
-
-            conns.forEach(c => {
-              delete initializedConnections[c.id];
-            });
+            let conns = unregister(id);
 
             // Call the user-defined remove function
             child.props.onRemove(id, conns);
@@ -354,7 +353,21 @@ export function usePlumbContainer(options = {}) {
     return childrenArray.map(interceptOnRemoveNode);
   }
 
-  return [ref, plumb];
+  function unregister(id) {
+    let conns = [...instance.getConnections({ source: id }), ...instance.getConnections({ target: id })].map(
+      _connection
+    );
+    _unregister(id, instance);
+    delete initializedNodes[id];
+
+    conns.forEach(c => {
+      delete initializedConnections[c.id];
+    });
+
+    return conns;
+  }
+
+  return [ref, plumb, unregister];
 }
 
 export default usePlumbContainer;
