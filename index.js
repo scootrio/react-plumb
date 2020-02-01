@@ -354,9 +354,13 @@ export function usePlumbContainer(options = {}) {
   }
 
   function unregister(id) {
-    let conns = [...instance.getConnections({ source: id }), ...instance.getConnections({ target: id })].map(
-      _connection
-    );
+    let conns = [];
+    instance.select({ source: id }).each(function(c) {
+      conns.push(_connection(c));
+    });
+    instance.select({ target: id }).each(function(c) {
+      conns.push(_connection(c));
+    });
     _unregister(id, instance);
     delete initializedNodes[id];
 
