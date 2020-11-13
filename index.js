@@ -211,13 +211,16 @@ export function usePlumbContainer(options = {}) {
    *
    * @param {React.Component|React.Component[]} [children] the child components representing the nodes in jsPlumb
    */
-  function plumb(children) {
-    let childrenArray;
-    if (children.type && children.type === React.Fragment) {
-      childrenArray = React.Children.toArray(children.props.children);
-    } else {
-      childrenArray = React.Children.toArray(children);
+  function plumb(...children) {
+    let childrenArray = [];
+    for(const c of children) {
+      if (c.type && c.type === React.Fragment) {
+        childrenArray = childrenArray.concat(React.Children.toArray(c.props.children));
+      } else {
+        childrenArray = childrenArray.concat(React.Children.toArray(c));
+      }
     }
+    
 
     useEffect(() => {
       function init(child) {
